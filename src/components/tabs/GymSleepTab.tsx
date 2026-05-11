@@ -2,8 +2,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { Moon, Dumbbell, ArrowRightLeft, Ruler, X, Check } from 'lucide-react';
 import { useDay } from '../../hooks/useDay';
 import { WORKOUTS, CARDIO_CONFIG } from '../../constants/workouts';
+import { isSleepLocked, isWorkoutSwapLocked, isWorkoutLocked, getLockedMessage } from '../../utils/lockHelpers';
 import type { Exercise, WorkoutDay } from '../../constants/workouts';
 import { ExerciseCard } from '../ui/ExerciseCard';
+import { LockedField } from '../ui/LockedField';
 import { getSleepColor, calculateSleepHours } from '../../utils/calculations';
 import { supabase } from '../../lib/supabase';
 import { isFirstOfMonth, getDateForWorkoutDay, getDayLabel, getDaysAgo, formatDate, getMonthStart, getMonthEnd, formatDateDisplay } from '../../utils/dateHelpers';
@@ -428,12 +430,18 @@ export function GymSleepTab() {
             <Dumbbell className="w-4 h-4 text-emerald-400" />
             <h3 className="text-sm font-medium text-white">{activeWorkout.label}</h3>
           </div>
-          <button
-            onClick={() => setShowSwap(!showSwap)}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-[#1e1e2e] text-slate-400 rounded-lg hover:text-white transition-colors"
-          >
-            <ArrowRightLeft className="w-3 h-3" /> Swap
-          </button>
+          {isWorkoutSwapLocked() ? (
+            <div className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-[#1e1e2e] text-slate-500 rounded-lg cursor-not-allowed" title={getLockedMessage('swap', 'swap_closed')}>
+              <ArrowRightLeft className="w-3 h-3" /> Locked
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowSwap(!showSwap)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] bg-[#1e1e2e] text-slate-400 rounded-lg hover:text-white transition-colors"
+            >
+              <ArrowRightLeft className="w-3 h-3" /> Swap
+            </button>
+          )}
         </div>
 
         {showSwap && (
@@ -564,24 +572,39 @@ export function GymSleepTab() {
         </div>
 
         <div className="space-y-2.5 mb-3">
-          <div>
-            <label className="text-[10px] text-slate-500 block mb-1">Bedtime</label>
-            <input
-              type="time"
-              value={bedtime}
-              onChange={(e) => setBedtime(e.target.value)}
-              className="w-40 max-w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+          {!isSleepLocked(bedtime, wakeTime).bedtimeAvailable ? (
+            <LockedField
+              state="not_yet"
+              message={getLockedMessage('sleep', 'not_yet', { availableTime: '10 PM' })}
             />
-          </div>
-          <div>
-            <label className="text-[10px] text-slate-500 block mb-1">Wake time</label>
-            <input
-              type="time"
-              value={wakeTime}
-              onChange={(e) => setWakeTime(e.target.value)}
-              className="w-40 max-w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+          ) : (
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-1">Bedtime</label>
+              <input
+                type="time"
+                value={bedtime}
+                onChange={(e) => setBedtime(e.target.value)}
+                className="w-40 max-w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+              />
+            </div>
+          )}
+
+          {!isSleepLocked(bedtime, wakeTime).wakeAvailable ? (
+            <LockedField
+              state="not_yet"
+              message={getLockedMessage('sleep', 'not_yet', { availableTime: '5 AM' })}
             />
-          </div>
+          ) : (
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-1">Wake time</label>
+              <input
+                type="time"
+                value={wakeTime}
+                onChange={(e) => setWakeTime(e.target.value)}
+                className="w-40 max-w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+              />
+            </div>
+          )}
         </div>
 
         {sleepHours > 0 && (
@@ -595,7 +618,12 @@ export function GymSleepTab() {
 
         <button
           onClick={handleSleepSave}
-          className="w-full py-2.5 bg-blue-400/10 text-blue-400 text-xs font-medium rounded-lg hover:bg-blue-400/20 transition-colors active:scale-[0.98]"
+          disabled={isSleepLocked(bedtime, wakeTime).isLocked}
+          className={`w-full py-2.5 text-xs font-medium rounded-lg transition-colors active:scale-[0.98] ${
+            isSleepLocked(bedtime, wakeTime).isLocked
+              ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              : 'bg-blue-400/10 text-blue-400 hover:bg-blue-400/20'
+          }`}
         >
           {sleepSaved ? 'Sleep Saved!' : 'Save Sleep'}
         </button>
@@ -607,64 +635,66 @@ export function GymSleepTab() {
       </div>
 
       {/* Body Measurements */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Ruler className="w-4 h-4 text-amber-400" />
-            <h3 className="text-sm font-medium text-white">Body Measurements</h3>
-          </div>
-          <button
-            onClick={() => setShowMeasurements(!showMeasurements)}
-            disabled={monthlyMeasurementLocked}
-            className={`px-3 py-1.5 text-[10px] rounded-lg transition-colors ${monthlyMeasurementLocked ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-amber-400/10 text-amber-400 hover:bg-amber-400/20'}`}
-          >
-            {monthlyMeasurementLocked ? 'Measurements logged this month' : showMeasurements ? 'Close' : 'Log Measurements'}
-          </button>
-        </div>
-
-        {monthlyMeasurementLocked && monthlyMeasurementDate && (
-          <p className="text-[10px] text-slate-500 mb-2">
-            Measurements logged for this month on {formatDateDisplay(monthlyMeasurementDate)}. Next entry opens next month.
-          </p>
-        )}
-
-        {isFirstOfMonth() && !showMeasurements && !monthlyMeasurementLocked && (
-          <p className="text-xs text-amber-400 mb-2">1st of the month — time to take measurements!</p>
-        )}
-
-        {!isFirstOfMonth() && !showMeasurements && (
-          <p className="text-xs text-slate-500">Monthly measurements on the 1st. Tap to log anytime.</p>
-        )}
-
-        {showMeasurements && (
-          <div className="space-y-2.5">
-            {MEASUREMENT_FIELDS.map(({ key, label, hint }) => (
-              <div key={key} className="flex items-center gap-3">
-                <div className="w-20 shrink-0">
-                  <p className="text-xs text-white">{label}</p>
-                  <p className="text-[10px] text-slate-500">{hint}</p>
-                </div>
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="cm"
-                  value={measurements[key]}
-                  onChange={(e) => setMeasurements({ ...measurements, [key]: e.target.value })}
-                  className="flex-1 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400/50 focus:outline-none"
-                />
-              </div>
-            ))}
-
+      {monthlyMeasurementLocked ? (
+        <LockedField
+          state="locked"
+          message="Measurements logged this month"
+          value={`Logged on ${formatDateDisplay(monthlyMeasurementDate || '')}`}
+        />
+      ) : isFirstOfMonth() ? (
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Ruler className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-medium text-white">Body Measurements</h3>
+            </div>
             <button
-              onClick={handleSaveMeasurements}
-              disabled={measurementsSaved}
-              className="w-full mt-2 py-2.5 bg-amber-400 text-[#0a0a0f] text-sm font-semibold rounded-xl hover:bg-amber-300 transition-colors disabled:opacity-50 active:scale-[0.98]"
+              onClick={() => setShowMeasurements(!showMeasurements)}
+              className="px-3 py-1.5 text-[10px] bg-amber-400/10 text-amber-400 rounded-lg hover:bg-amber-400/20 transition-colors"
             >
-              {measurementsSaved ? 'Saved!' : 'Save Measurements'}
+              {showMeasurements ? 'Close' : 'Log Measurements'}
             </button>
           </div>
-        )}
-      </div>
+
+          {!showMeasurements && (
+            <p className="text-xs text-amber-400 mb-2">1st of the month — time to take measurements!</p>
+          )}
+
+          {showMeasurements && (
+            <div className="space-y-2.5">
+              {MEASUREMENT_FIELDS.map(({ key, label, hint }) => (
+                <div key={key} className="flex items-center gap-3">
+                  <div className="w-20 shrink-0">
+                    <p className="text-xs text-white">{label}</p>
+                    <p className="text-[10px] text-slate-500">{hint}</p>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    placeholder="cm"
+                    value={measurements[key]}
+                    onChange={(e) => setMeasurements({ ...measurements, [key]: e.target.value })}
+                    className="flex-1 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-amber-400/50 focus:outline-none"
+                  />
+                </div>
+              ))}
+
+              <button
+                onClick={handleSaveMeasurements}
+                disabled={measurementsSaved}
+                className="w-full mt-2 py-2.5 bg-amber-400 text-[#0a0a0f] text-sm font-semibold rounded-xl hover:bg-amber-300 transition-colors disabled:opacity-50 active:scale-[0.98]"
+              >
+                {measurementsSaved ? 'Saved!' : 'Save Measurements'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <LockedField
+          state="not_available"
+          message="Monthly measurements on the 1st of every month"
+        />
+      )}
     </div>
   );
 }

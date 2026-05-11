@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { Bot, Copy, StickyNote } from 'lucide-react';
 import { useDay } from '../../hooks/useDay';
 import { useSettings } from '../../hooks/useSettings';
+import { isWeeklyAnalysisLocked, isMonthlyAnalysisLocked, getLockedMessage } from '../../utils/lockHelpers';
 import { supabase } from '../../lib/supabase';
+import { LockedField } from '../ui/LockedField';
 import { SuggestionCard } from '../ui/SuggestionCard';
 
 interface Suggestion {
@@ -28,6 +30,7 @@ export function CoachTab() {
   const [notes, setNotes] = useState(log?.notes || '');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [copied, setCopied] = useState(false);
+  const [weekLogs, setWeekLogs] = useState<any[]>([]);
 
   useEffect(() => {
     if (log?.ai_analysis) setAnalysis(log.ai_analysis);
@@ -46,6 +49,25 @@ export function CoachTab() {
   useEffect(() => {
     fetchSuggestions();
   }, [fetchSuggestions]);
+
+  const fetchWeekLogs = useCallback(async () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .gte('date', sevenDaysAgo)
+      .order('date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching week logs:', error);
+      return;
+    }
+    setWeekLogs(data || []);
+  }, []);
+
+  useEffect(() => {
+    fetchWeekLogs();
+  }, [fetchWeekLogs]);
 
   const handleAnalyze = useCallback(async () => {
     if (!log) return;
@@ -191,6 +213,38 @@ export function CoachTab() {
         )}
         {analyzing ? 'Analyzing...' : 'Analyze My Day'}
       </button>
+
+      {/* Weekly Analysis */}
+      {isWeeklyAnalysisLocked(weekLogs, new Date()) === 'active' ? (
+        <button
+          onClick={() => {}}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-400 text-white text-sm font-medium rounded-xl hover:bg-blue-500 transition-colors"
+        >
+          <Bot className="w-4 h-4" />
+          Weekly Analysis (Sunday)
+        </button>
+      ) : (
+        <LockedField
+          state={isWeeklyAnalysisLocked(weekLogs, new Date())}
+          message={getLockedMessage('weekly_analysis', isWeeklyAnalysisLocked(weekLogs, new Date()))}
+        />
+      )}
+
+      {/* Monthly Analysis */}
+      {isMonthlyAnalysisLocked([], new Date()) === 'active' ? (
+        <button
+          onClick={() => {}}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-purple-400 text-white text-sm font-medium rounded-xl hover:bg-purple-500 transition-colors"
+        >
+          <Bot className="w-4 h-4" />
+          Monthly Analysis (1st)
+        </button>
+      ) : (
+        <LockedField
+          state={isMonthlyAnalysisLocked([], new Date())}
+          message={getLockedMessage('monthly_analysis', isMonthlyAnalysisLocked([], new Date()))}
+        />
+      )}
 
       {analysis && (
         <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">

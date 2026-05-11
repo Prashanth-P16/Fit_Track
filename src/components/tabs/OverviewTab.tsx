@@ -4,9 +4,11 @@ import { useDay } from '../../hooks/useDay';
 import { useSettings } from '../../hooks/useSettings';
 import { getMealsForDay } from '../../utils/calculations';
 import { getProgressBarColor, getDinnerOption } from '../../utils/calculations';
+import { isWaterLocked, isWeightLocked, isDinnerLocked, isMealLocked, getLockedMessage } from '../../utils/lockHelpers';
 import type { DinnerOption } from '../../constants/meals';
 import { MealCard } from '../ui/MealCard';
 import { DinnerDropdown } from '../ui/DinnerDropdown';
+import { LockedField } from '../ui/LockedField';
 import { isSunday, getWeekStart, formatDateDisplay } from '../../utils/dateHelpers';
 import { supabase } from '../../lib/supabase';
 
@@ -214,66 +216,81 @@ export function OverviewTab() {
               style={{ width: `${Math.min((water / targets.water) * 100, 100)}%` }}
             />
           </div>
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => handleWaterAdd(250)}
-              className="px-2.5 py-1 text-[10px] bg-cyan-400/10 text-cyan-400 rounded-lg hover:bg-cyan-400/20 transition-colors"
-            >
-              +250ml
-            </button>
-            <button
-              onClick={() => handleWaterAdd(500)}
-              className="px-2.5 py-1 text-[10px] bg-cyan-400/10 text-cyan-400 rounded-lg hover:bg-cyan-400/20 transition-colors"
-            >
-              +500ml
-            </button>
-            <button
-              onClick={() => handleWaterAdd(1000)}
-              className="px-2.5 py-1 text-[10px] bg-cyan-400/10 text-cyan-400 rounded-lg hover:bg-cyan-400/20 transition-colors"
-            >
-              +1L
-            </button>
-          </div>
+          {!isWaterLocked() && (
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => handleWaterAdd(250)}
+                className="px-2.5 py-1 text-[10px] bg-cyan-400/10 text-cyan-400 rounded-lg hover:bg-cyan-400/20 transition-colors"
+              >
+                +250ml
+              </button>
+              <button
+                onClick={() => handleWaterAdd(500)}
+                className="px-2.5 py-1 text-[10px] bg-cyan-400/10 text-cyan-400 rounded-lg hover:bg-cyan-400/20 transition-colors"
+              >
+                +500ml
+              </button>
+              <button
+                onClick={() => handleWaterAdd(1000)}
+                className="px-2.5 py-1 text-[10px] bg-cyan-400/10 text-cyan-400 rounded-lg hover:bg-cyan-400/20 transition-colors"
+              >
+                +1L
+              </button>
+            </div>
+          )}
+          {isWaterLocked() && (
+            <p className="text-xs text-slate-500 mt-2">Water logging available 9 AM - 10 PM</p>
+          )}
         </div>
       </div>
 
       {/* Weekly Weight */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Scale className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs text-slate-400">Weekly Weigh-in</span>
-        </div>
-        <input
-          type="number"
-          step="0.1"
-          placeholder="Weight in kg"
-          value={weightInput}
-          onChange={handleWeightLog}
-          disabled={Boolean(weeklyWeightLog)}
-          className={`w-full bg-[#0a0a0f] border rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:outline-none ${weeklyWeightLog ? 'border-slate-700 text-slate-400 bg-[#0d0d13] cursor-not-allowed' : 'border-[#1e1e2e] text-white focus:border-emerald-400/50'}`}
+      {isWeightLocked(log || {}, new Date()) ? (
+        <LockedField
+          state="locked"
+          message={getLockedMessage('weight', 'locked')}
+          value={weeklyWeightLog ? `${weeklyWeightLog.weight} kg` : undefined}
         />
-        {!weeklyWeightLog && weightInput && (
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={confirmWeightLog}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded-lg transition-colors"
-            >
-              ✓ Confirm
-            </button>
-            <button
-              onClick={cancelWeightLog}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded-lg transition-colors"
-            >
-              ✗ Cancel
-            </button>
+      ) : isSunday(new Date()) ? (
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Scale className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs text-slate-400">Weekly Weigh-in</span>
           </div>
-        )}
-        <p className={`text-[10px] mt-2 ${weeklyWeightLog ? 'text-slate-500' : 'text-slate-400'}`}>
-          {weeklyWeightLog
-            ? `Weight logged for the week on ${formatDateDisplay(weeklyWeightLog.date)}. Next entry available after this week.`
-            : 'Enter your weight once per week. Your weekly weight is shown in progress charts. Use the confirm button to save.'}
-        </p>
-      </div>
+          <input
+            type="number"
+            step="0.1"
+            placeholder="Weight in kg"
+            value={weightInput}
+            onChange={handleWeightLog}
+            className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm placeholder-slate-600 text-white focus:border-emerald-400/50 focus:outline-none"
+          />
+          {weightInput && (
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={confirmWeightLog}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded-lg transition-colors"
+              >
+                ✓ Confirm
+              </button>
+              <button
+                onClick={cancelWeightLog}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded-lg transition-colors"
+              >
+                ✗ Cancel
+              </button>
+            </div>
+          )}
+          <p className="text-[10px] text-slate-400 mt-2">
+            Enter your weight once per week. Your weekly weight is shown in progress charts.
+          </p>
+        </div>
+      ) : (
+        <LockedField
+          state="not_available"
+          message={getLockedMessage('weight', 'non_sunday')}
+        />
+      )}
 
       {/* Daily Checklist */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
@@ -302,25 +319,49 @@ export function OverviewTab() {
       <div>
         <h3 className="text-xs text-slate-400 mb-2">Meals</h3>
         <div className="space-y-2">
-          {meals.map((meal) => (
-            <MealCard
-              key={meal.id}
-              meal={meal}
-              status={(mealStatus[meal.id] as 'done' | 'skipped' | 'pending') || 'pending'}
-              onDone={() => handleMealDone(meal.id)}
-              onSkip={() => handleMealSkip(meal.id)}
-            />
-          ))}
+          {meals.map((meal) => {
+            const status = (mealStatus[meal.id] as 'done' | 'skipped' | 'pending') || 'pending';
+            const lockState = isMealLocked(meal.id, meal.time, status);
+            
+            return (
+              <div key={meal.id}>
+                {lockState === 'active' || lockState === 'upcoming' || lockState === 'missed' ? (
+                  <MealCard
+                    meal={meal}
+                    status={status}
+                    onDone={() => handleMealDone(meal.id)}
+                    onSkip={() => handleMealSkip(meal.id)}
+                  />
+                ) : (
+                  <LockedField
+                    state={lockState}
+                    message={getLockedMessage(meal.id, lockState, { mealTime: meal.time })}
+                    value={status === 'done' ? `${meal.cal} kcal, ${meal.protein}g protein` : undefined}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Dinner Dropdown */}
-      <DinnerDropdown
-        selected={log?.dinner_type || null}
-        customDinner={customDinner}
-        onSelect={handleDinnerSelect}
-        onCustomChange={handleCustomDinnerChange}
-      />
+      {isDinnerLocked(log?.dinner_type || null, log || {}) === 'not_yet' ? (
+        <LockedField state="not_yet" message={getLockedMessage('dinner', 'not_yet', { availableTime: '9 PM' })} />
+      ) : isDinnerLocked(log?.dinner_type || null, log || {}) === 'locked' ? (
+        <LockedField
+          state="locked"
+          message={getLockedMessage('dinner', 'locked')}
+          value={dinnerOption?.label || 'Dinner selected'}
+        />
+      ) : (
+        <DinnerDropdown
+          selected={log?.dinner_type || null}
+          customDinner={customDinner}
+          onSelect={handleDinnerSelect}
+          onCustomChange={handleCustomDinnerChange}
+        />
+      )}
 
       {/* Remaining */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">

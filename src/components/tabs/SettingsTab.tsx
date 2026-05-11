@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Save, Bell, Droplets, Moon, Flame, Beef } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
+import { useBaseline } from '../../hooks/useBaseline';
+import { SetMeasurementsModal } from '../SetMeasurementsModal';
 import type { UserSettings } from '../../hooks/useSettings';
 
 export function SettingsTab() {
   const { settings, loading, updateSettings } = useSettings();
+  const { baseline, hasMeasurements } = useBaseline();
+  const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
   const [form, setForm] = useState({
     calorie_target: 1824,
     protein_target: 169,
@@ -47,115 +51,140 @@ export function SettingsTab() {
   }
 
   return (
-    <div className="px-4 pb-28 space-y-4">
-      {/* Daily Targets */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
-        <h3 className="text-xs text-slate-400 mb-3">Daily Targets</h3>
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Flame className="w-4 h-4 text-orange-400 shrink-0" />
+    <>
+      <div className="px-4 pb-28 space-y-4">
+        {/* Baseline Measurements Reminder */}
+        {baseline && !hasMeasurements && (
+          <div className="bg-yellow-950/30 border border-yellow-700/50 rounded-xl p-4 flex items-start gap-3">
+            <span className="text-xl">📏</span>
             <div className="flex-1">
-              <label className="text-[10px] text-slate-500 block">Calories (kcal)</label>
-              <input
-                type="number"
-                value={form.calorie_target}
-                onChange={(e) => setForm({ ...form, calorie_target: Number(e.target.value) })}
-                className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Beef className="w-4 h-4 text-blue-400 shrink-0" />
-            <div className="flex-1">
-              <label className="text-[10px] text-slate-500 block">Protein (g)</label>
-              <input
-                type="number"
-                value={form.protein_target}
-                onChange={(e) => setForm({ ...form, protein_target: Number(e.target.value) })}
-                className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Droplets className="w-4 h-4 text-cyan-400 shrink-0" />
-            <div className="flex-1">
-              <label className="text-[10px] text-slate-500 block">Water (ml)</label>
-              <input
-                type="number"
-                value={form.water_target}
-                onChange={(e) => setForm({ ...form, water_target: Number(e.target.value) })}
-                className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Moon className="w-4 h-4 text-blue-400 shrink-0" />
-            <div className="flex-1">
-              <label className="text-[10px] text-slate-500 block">Sleep (hours)</label>
-              <input
-                type="number"
-                step="0.5"
-                value={form.sleep_target}
-                onChange={(e) => setForm({ ...form, sleep_target: Number(e.target.value) })}
-                className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Bell className="w-4 h-4 text-amber-400" />
-          <h3 className="text-xs text-slate-400">Notifications</h3>
-        </div>
-        <div className="space-y-3">
-          {[
-            { key: 'notification_meals' as const, label: 'Meal reminders' },
-            { key: 'notification_water' as const, label: 'Water reminders' },
-            { key: 'notification_measurements' as const, label: 'Monthly measurement reminder' },
-          ].map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <span className="text-sm text-white">{label}</span>
+              <h3 className="text-sm font-medium text-yellow-100 mb-1">Baseline measurements not set</h3>
+              <p className="text-xs text-yellow-100/70 mb-3">Set them now for accurate monthly tracking</p>
               <button
-                onClick={() => setForm({ ...form, [key]: !form[key] })}
-                className={`w-10 h-5 rounded-full transition-colors ${
-                  form[key] ? 'bg-emerald-400' : 'bg-[#1e1e2e]'
-                }`}
+                onClick={() => setShowMeasurementsModal(true)}
+                className="text-xs bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
               >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                    form[key] ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
+                Set Baseline Measurements
               </button>
             </div>
-          ))}
+          </div>
+        )}
 
-          <div>
-            <label className="text-[10px] text-slate-500 block mb-1">Water reminder interval (hours)</label>
-            <input
-              type="number"
-              value={form.water_reminder_hours}
-              onChange={(e) => setForm({ ...form, water_reminder_hours: Number(e.target.value) })}
-              className="w-20 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
-            />
+        {/* Daily Targets */}
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
+          <h3 className="text-xs text-slate-400 mb-3">Daily Targets</h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Flame className="w-4 h-4 text-orange-400 shrink-0" />
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 block">Calories (kcal)</label>
+                <input
+                  type="number"
+                  value={form.calorie_target}
+                  onChange={(e) => setForm({ ...form, calorie_target: Number(e.target.value) })}
+                  className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Beef className="w-4 h-4 text-blue-400 shrink-0" />
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 block">Protein (g)</label>
+                <input
+                  type="number"
+                  value={form.protein_target}
+                  onChange={(e) => setForm({ ...form, protein_target: Number(e.target.value) })}
+                  className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Droplets className="w-4 h-4 text-cyan-400 shrink-0" />
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 block">Water (ml)</label>
+                <input
+                  type="number"
+                  value={form.water_target}
+                  onChange={(e) => setForm({ ...form, water_target: Number(e.target.value) })}
+                  className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Moon className="w-4 h-4 text-blue-400 shrink-0" />
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 block">Sleep (hours)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={form.sleep_target}
+                  onChange={(e) => setForm({ ...form, sleep_target: Number(e.target.value) })}
+                  className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Notifications */}
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell className="w-4 h-4 text-amber-400" />
+            <h3 className="text-xs text-slate-400">Notifications</h3>
+          </div>
+          <div className="space-y-3">
+            {[
+              { key: 'notification_meals' as const, label: 'Meal reminders' },
+              { key: 'notification_water' as const, label: 'Water reminders' },
+              { key: 'notification_measurements' as const, label: 'Monthly measurement reminder' },
+            ].map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between">
+                <span className="text-sm text-white">{label}</span>
+                <button
+                  onClick={() => setForm({ ...form, [key]: !form[key] })}
+                  className={`w-10 h-5 rounded-full transition-colors ${
+                    form[key] ? 'bg-emerald-400' : 'bg-[#1e1e2e]'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                      form[key] ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            ))}
+
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-1">Water reminder interval (hours)</label>
+              <input
+                type="number"
+                value={form.water_reminder_hours}
+                onChange={(e) => setForm({ ...form, water_reminder_hours: Number(e.target.value) })}
+                className="w-20 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-400/50 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-400 text-[#0a0a0f] text-sm font-medium rounded-xl hover:bg-emerald-300 transition-colors"
+        >
+          <Save className="w-4 h-4" />
+          {saved ? 'Saved!' : 'Save Settings'}
+        </button>
       </div>
 
-      {/* Save */}
-      <button
-        onClick={handleSave}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-400 text-[#0a0a0f] text-sm font-medium rounded-xl hover:bg-emerald-300 transition-colors"
-      >
-        <Save className="w-4 h-4" />
-        {saved ? 'Saved!' : 'Save Settings'}
-      </button>
-    </div>
+      <SetMeasurementsModal
+        isOpen={showMeasurementsModal}
+        onClose={() => setShowMeasurementsModal(false)}
+        onSave={() => window.location.reload()}
+      />
+    </>
   );
 }
