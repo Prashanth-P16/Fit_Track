@@ -23,6 +23,7 @@ export function OverviewTab() {
   const meals = getMealsForDay(isRestDay);
   const mealStatus = log?.meals || {};
   const [weeklyWeightLog, setWeeklyWeightLog] = useState<{ date: string; weight: number } | null>(null);
+  const [weightInput, setWeightInput] = useState('');
 
   useEffect(() => {
     if (log?.dinner_type) {
@@ -126,12 +127,27 @@ export function OverviewTab() {
 
   const handleWeightLog = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = parseFloat(e.target.value);
+      setWeightInput(e.target.value);
+    },
+    []
+  );
+
+  const confirmWeightLog = useCallback(
+    () => {
+      const val = parseFloat(weightInput);
       if (!isNaN(val) && val > 0) {
         updateLog({ weight: val });
+        setWeightInput('');
       }
     },
-    [updateLog]
+    [weightInput, updateLog]
+  );
+
+  const cancelWeightLog = useCallback(
+    () => {
+      setWeightInput('');
+    },
+    []
   );
 
   if (loading) {
@@ -231,15 +247,31 @@ export function OverviewTab() {
           type="number"
           step="0.1"
           placeholder="Weight in kg"
-          value={weeklyWeightLog?.weight ?? log?.weight ?? ''}
+          value={weightInput}
           onChange={handleWeightLog}
           disabled={Boolean(weeklyWeightLog)}
           className={`w-full bg-[#0a0a0f] border rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:outline-none ${weeklyWeightLog ? 'border-slate-700 text-slate-400 bg-[#0d0d13] cursor-not-allowed' : 'border-[#1e1e2e] text-white focus:border-emerald-400/50'}`}
         />
+        {!weeklyWeightLog && weightInput && (
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={confirmWeightLog}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded-lg transition-colors"
+            >
+              ✓ Confirm
+            </button>
+            <button
+              onClick={cancelWeightLog}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded-lg transition-colors"
+            >
+              ✗ Cancel
+            </button>
+          </div>
+        )}
         <p className={`text-[10px] mt-2 ${weeklyWeightLog ? 'text-slate-500' : 'text-slate-400'}`}>
           {weeklyWeightLog
             ? `Weight logged for the week on ${formatDateDisplay(weeklyWeightLog.date)}. Next entry available after this week.`
-            : 'Enter your weight once per week. Your weekly weight is shown in progress charts.'}
+            : 'Enter your weight once per week. Your weekly weight is shown in progress charts. Use the confirm button to save.'}
         </p>
       </div>
 
