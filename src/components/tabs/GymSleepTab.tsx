@@ -526,7 +526,7 @@ export function GymSleepTab() {
               type="time"
               value={bedtime}
               onChange={(e) => setBedtime(e.target.value)}
-              className="w-full max-w-[15rem] bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+              className="w-40 max-w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
             />
           </div>
           <div>
@@ -535,7 +535,7 @@ export function GymSleepTab() {
               type="time"
               value={wakeTime}
               onChange={(e) => setWakeTime(e.target.value)}
-              className="w-full max-w-[15rem] bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+              className="w-40 max-w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
             />
           </div>
         </div>
