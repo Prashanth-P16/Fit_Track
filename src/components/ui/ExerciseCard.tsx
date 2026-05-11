@@ -4,6 +4,7 @@ interface ExerciseCardProps {
   exercise: Exercise;
   lastWeekWeights: { weight: number; reps: number }[];
   thisWeekSets: { weight: string; reps: string }[];
+  personalBests: boolean[];
   onSetChange: (setIndex: number, field: 'weight' | 'reps', value: string) => void;
 }
 
@@ -11,6 +12,7 @@ export function ExerciseCard({
   exercise,
   lastWeekWeights,
   thisWeekSets,
+  personalBests,
   onSetChange,
 }: ExerciseCardProps) {
   return (
@@ -52,6 +54,9 @@ export function ExerciseCard({
               onChange={(e) => onSetChange(i, 'reps', e.target.value)}
               className="w-16 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:border-emerald-400/50 focus:outline-none"
             />
+            {personalBests[i] && (
+              <span className="text-amber-400 text-xs font-bold shrink-0">PB</span>
+            )}
           </div>
         ))}
       </div>

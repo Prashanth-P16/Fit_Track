@@ -6,7 +6,7 @@ import type { Exercise, WorkoutDay } from '../../constants/workouts';
 import { ExerciseCard } from '../ui/ExerciseCard';
 import { getSleepColor, calculateSleepHours } from '../../utils/calculations';
 import { supabase } from '../../lib/supabase';
-import { isFirstOfMonth, getDateForWorkoutDay, getDayLabel } from '../../utils/dateHelpers';
+import { isFirstOfMonth, getDateForWorkoutDay, getDayLabel, getDaysAgo } from '../../utils/dateHelpers';
 
 const MEASUREMENT_FIELDS = [
   { key: 'waist', label: 'Waist', hint: 'At navel level' },
@@ -21,6 +21,13 @@ const MEASUREMENT_FIELDS = [
 ] as const;
 
 type MeasurementKey = (typeof MEASUREMENT_FIELDS)[number]['key'];
+
+interface HistorySet {
+  weight: number;
+  reps: number;
+  set_number: number;
+  is_personal_best: boolean;
+}
 
 export function GymSleepTab() {
   const { log, loading, dayNum, workoutDayNum, effectiveWorkoutDay, todayWorkout, updateLog } = useDay();
@@ -43,14 +50,89 @@ export function GymSleepTab() {
   });
   const [measurementsSaved, setMeasurementsSaved] = useState(false);
 
+  // Last week's exercise history grouped by exercise name
+  const [lastWeekHistory, setLastWeekHistory] = useState<Record<string, HistorySet[]>>({});
+  // All-time max weight per exercise (for personal best detection)
+  const [allTimeMaxWeight, setAllTimeMaxWeight] = useState<Record<string, number>>({});
+  // Personal best flags per exercise per set index
+  const [personalBests, setPersonalBests] = useState<Record<string, boolean[]>>({});
+
   const sleepHours = bedtime && wakeTime ? calculateSleepHours(bedtime, wakeTime) : 0;
 
-  // Use the hook-resolved workout day (accounts for persisted swaps)
-  // plus any in-session swap that hasn't been persisted yet
   const [pendingSwapDay, setPendingSwapDay] = useState<number | null>(null);
   const activeWorkoutDay = pendingSwapDay || effectiveWorkoutDay;
   const activeWorkout: WorkoutDay = WORKOUTS[activeWorkoutDay] || WORKOUTS[7];
   const activeIsRestDay = activeWorkoutDay === 7;
+
+  // Fetch last week's exercise history
+  useEffect(() => {
+    const fetchHistory = async () => {
+      const sevenDaysAgo = getDaysAgo(7);
+      const { data, error } = await supabase
+        .from('exercise_history')
+        .select('exercise_name, set_number, weight, reps, is_personal_best')
+        .gte('date', sevenDaysAgo)
+        .order('set_number', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching exercise history:', error);
+        return;
+      }
+
+      if (data) {
+        const grouped: Record<string, HistorySet[]> = {};
+        for (const row of data) {
+          if (!grouped[row.exercise_name]) grouped[row.exercise_name] = [];
+          grouped[row.exercise_name].push({
+            weight: Number(row.weight),
+            reps: Number(row.reps),
+            set_number: row.set_number,
+            is_personal_best: row.is_personal_best,
+          });
+        }
+        setLastWeekHistory(grouped);
+      }
+    };
+
+    const fetchAllTimeMax = async () => {
+      const { data, error } = await supabase
+        .from('exercise_history')
+        .select('exercise_name, weight');
+
+      if (error) {
+        console.error('Error fetching all-time max:', error);
+        return;
+      }
+
+      if (data) {
+        const maxMap: Record<string, number> = {};
+        for (const row of data) {
+          const w = Number(row.weight);
+          if (!maxMap[row.exercise_name] || w > maxMap[row.exercise_name]) {
+            maxMap[row.exercise_name] = w;
+          }
+        }
+        setAllTimeMaxWeight(maxMap);
+      }
+    };
+
+    fetchHistory();
+    fetchAllTimeMax();
+  }, [log]);
+
+  // Detect personal bests as user types weights
+  useEffect(() => {
+    const pbs: Record<string, boolean[]> = {};
+    for (const [name, sets] of Object.entries(exerciseSets)) {
+      pbs[name] = sets.map((s) => {
+        const w = Number(s.weight);
+        if (!w || w <= 0) return false;
+        const maxW = allTimeMaxWeight[name];
+        return maxW != null && w > maxW;
+      });
+    }
+    setPersonalBests(pbs);
+  }, [exerciseSets, allTimeMaxWeight]);
 
   useEffect(() => {
     if (!log) return;
@@ -124,6 +206,7 @@ export function GymSleepTab() {
           const weight = Number(sets[i].weight);
           const reps = Number(sets[i].reps);
           if (weight > 0 && reps > 0) {
+            const isPB = personalBests[name]?.[i] || false;
             await supabase.from('exercise_history').insert({
               date: today,
               day_num: dayNum,
@@ -131,9 +214,25 @@ export function GymSleepTab() {
               set_number: i + 1,
               weight,
               reps,
+              is_personal_best: isPB,
             });
           }
         }
+      }
+
+      // Refresh all-time max after saving
+      const { data: newData } = await supabase
+        .from('exercise_history')
+        .select('exercise_name, weight');
+      if (newData) {
+        const maxMap: Record<string, number> = {};
+        for (const row of newData) {
+          const w = Number(row.weight);
+          if (!maxMap[row.exercise_name] || w > maxMap[row.exercise_name]) {
+            maxMap[row.exercise_name] = w;
+          }
+        }
+        setAllTimeMaxWeight(maxMap);
       }
 
       setWorkoutDone(true);
@@ -144,7 +243,7 @@ export function GymSleepTab() {
     } finally {
       setSaving(false);
     }
-  }, [exerciseSets, noGym, noGymReason, cardioDone, log, updateLog, dayNum]);
+  }, [exerciseSets, noGym, noGymReason, cardioDone, log, updateLog, dayNum, personalBests]);
 
   const handleSleepSave = useCallback(async () => {
     if (!log) return;
@@ -167,16 +266,13 @@ export function GymSleepTab() {
       const todayLabel = WORKOUTS[workoutDayNum]?.label || `Day ${workoutDayNum}`;
       const targetLabel = WORKOUTS[targetDay]?.label || `Day ${targetDay}`;
 
-      // Optimistically update UI
       setPendingSwapDay(targetDay);
 
-      // Update today's log: mark swapped with target day
       await updateLog({
         workout_swapped: true,
         swap_reason: `Swapped Day ${workoutDayNum} with Day ${targetDay}`,
       });
 
-      // Update or create the target day's log: mark swapped with today's workout
       const { data: targetLog } = await supabase
         .from('daily_logs')
         .select('id')
@@ -275,7 +371,6 @@ export function GymSleepTab() {
 
   return (
     <div className="px-4 pb-28 space-y-4">
-      {/* Swap Confirmation Toast */}
       {swapConfirmMsg && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-emerald-400 text-[#0a0a0f] text-sm font-medium rounded-xl shadow-lg shadow-emerald-400/20 animate-[fadeInUp_0.3s_ease-out]">
           {swapConfirmMsg}
@@ -383,8 +478,9 @@ export function GymSleepTab() {
             <ExerciseCard
               key={exercise.name}
               exercise={exercise}
-              lastWeekWeights={[]}
+              lastWeekWeights={(lastWeekHistory[exercise.name] || []).map(s => ({ weight: s.weight, reps: s.reps }))}
               thisWeekSets={exerciseSets[exercise.name] || Array.from({ length: exercise.sets }, () => ({ weight: '', reps: '' }))}
+              personalBests={personalBests[exercise.name] || Array.from({ length: exercise.sets }, () => false)}
               onSetChange={(i, field, value) => handleSetChange(exercise.name, i, field, value)}
             />
           ))}
