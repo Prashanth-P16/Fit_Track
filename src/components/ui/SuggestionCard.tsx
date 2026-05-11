@@ -9,9 +9,11 @@ interface SuggestionCardProps {
   userFeedback?: string;
   weightBefore?: number;
   weightAfter?: number;
+  keepChange?: boolean | null;
   onResponse: (response: 'implementing' | 'will_do' | 'rejected') => void;
   onRejectionReason: (reason: string) => void;
   onFeedback: (feedback: string) => void;
+  onKeepChange: (keep: boolean) => void;
 }
 
 export function SuggestionCard({
@@ -23,9 +25,11 @@ export function SuggestionCard({
   userFeedback,
   weightBefore,
   weightAfter,
+  keepChange,
   onResponse,
   onRejectionReason,
   onFeedback,
+  onKeepChange,
 }: SuggestionCardProps) {
   const categoryColor: Record<string, string> = {
     diet: 'text-amber-400 bg-amber-400/10',
@@ -35,8 +39,14 @@ export function SuggestionCard({
     supplement: 'text-orange-400 bg-orange-400/10',
   };
 
+  const borderClass = keepChange === true
+    ? 'border-emerald-400/40'
+    : keepChange === false
+      ? 'border-red-400/40'
+      : 'border-[#1e1e2e]';
+
   return (
-    <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4 space-y-3">
+    <div className={`bg-[#12121a] border ${borderClass} rounded-xl p-4 space-y-3 transition-colors`}>
       <div className="flex items-center justify-between">
         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${categoryColor[category] || 'text-slate-400 bg-slate-400/10'}`}>
           {category}
@@ -100,7 +110,41 @@ export function SuggestionCard({
         </div>
       )}
 
-      {responseType !== 'pending' && (
+      {responseType === 'implementing' && userFeedback && keepChange == null && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-400">Keep this change permanently?</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onKeepChange(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-400/10 text-emerald-400 text-xs font-medium hover:bg-emerald-400/20 transition-colors"
+            >
+              <Check className="w-3 h-3" /> Yes, keeping it
+            </button>
+            <button
+              onClick={() => onKeepChange(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-400/10 text-red-400 text-xs font-medium hover:bg-red-400/20 transition-colors"
+            >
+              <X className="w-3 h-3" /> Reverting
+            </button>
+          </div>
+        </div>
+      )}
+
+      {keepChange === true && (
+        <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+          <Check className="w-3 h-3" />
+          <span>Keeping this change</span>
+        </div>
+      )}
+
+      {keepChange === false && (
+        <div className="flex items-center gap-1.5 text-xs text-red-400">
+          <RotateCcw className="w-3 h-3" />
+          <span>Reverting this change</span>
+        </div>
+      )}
+
+      {responseType !== 'pending' && keepChange == null && (
         <div className="flex items-center gap-1.5 text-xs text-slate-500">
           <RotateCcw className="w-3 h-3" />
           <span className="capitalize">{responseType.replace('_', ' ')}</span>

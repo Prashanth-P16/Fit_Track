@@ -98,24 +98,21 @@ export function CoachTab() {
     }
   }, [log, settings, targets, updateLog]);
 
-  const handleExportJSON = useCallback(() => {
-    if (!log) return;
-    const exportData = {
-      date: log.date,
-      dayNum: log.day_num,
-      meals: log.meals,
-      water: log.water,
-      workout: log.workout,
-      sleep: log.sleep,
-      weight: log.weight,
-      dinner_type: log.dinner_type,
-      notes: log.notes,
-      ai_score: log.ai_score,
-    };
-    navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+  const handleExportAllJSON = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .order('date', { ascending: true });
+
+    if (error) {
+      console.error('Export failed:', error);
+      return;
+    }
+
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [log]);
+  }, []);
 
   const handleNotesSave = useCallback(async () => {
     await updateLog({ notes });
@@ -145,6 +142,14 @@ export function CoachTab() {
       .update({ user_feedback: feedback, user_feedback_date: new Date().toISOString().split('T')[0] })
       .eq('id', suggestionId);
   }, []);
+
+  const handleKeepChange = useCallback(async (suggestionId: string, keep: boolean) => {
+    await supabase
+      .from('suggestion_tracker')
+      .update({ keep_change: keep })
+      .eq('id', suggestionId);
+    fetchSuggestions();
+  }, [fetchSuggestions]);
 
   if (loading) {
     return (
@@ -200,11 +205,11 @@ export function CoachTab() {
       )}
 
       <button
-        onClick={handleExportJSON}
+        onClick={handleExportAllJSON}
         className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#1e1e2e] text-slate-400 text-xs font-medium rounded-xl hover:text-white transition-colors"
       >
         <Copy className="w-3.5 h-3.5" />
-        {copied ? 'Copied!' : 'Export Data as JSON'}
+        {copied ? 'Copied!' : 'Export All Data as JSON'}
       </button>
 
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
@@ -241,9 +246,11 @@ export function CoachTab() {
               userFeedback={s.user_feedback || undefined}
               weightBefore={s.weight_before || undefined}
               weightAfter={s.weight_after || undefined}
+              keepChange={s.keep_change}
               onResponse={(response) => handleSuggestionResponse(s.id, response)}
               onRejectionReason={(reason) => handleRejectionReason(s.id, reason)}
               onFeedback={(feedback) => handleFeedback(s.id, feedback)}
+              onKeepChange={(keep) => handleKeepChange(s.id, keep)}
             />
           ))}
           {suggestions.length === 0 && (
