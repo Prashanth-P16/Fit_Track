@@ -520,22 +520,22 @@ export function GymSleepTab() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <div>
+          <div className="min-w-0">
             <label className="text-[10px] text-slate-500 block mb-1">Bedtime</label>
             <input
               type="time"
               value={bedtime}
               onChange={(e) => setBedtime(e.target.value)}
-              className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+              className="w-full min-w-0 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-[10px] text-slate-500 block mb-1">Wake time</label>
             <input
               type="time"
               value={wakeTime}
               onChange={(e) => setWakeTime(e.target.value)}
-              className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
+              className="w-full min-w-0 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2.5 text-sm text-white focus:border-blue-400/50 focus:outline-none"
             />
           </div>
         </div>
