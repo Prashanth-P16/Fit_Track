@@ -132,7 +132,14 @@ export function ProgressTab() {
       .from('body_measurements')
       .select('*')
       .order('date', { ascending: true });
-    if (measurements) setMeasurementData(measurements);
+    if (measurements) {
+      setMeasurementData(
+        measurements.map((m: Record<string, unknown>) => ({
+          ...m,
+          month: new Date(m.date as string).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        }))
+      );
+    }
 
     const { data: allLogs } = await supabase
       .from('daily_logs')

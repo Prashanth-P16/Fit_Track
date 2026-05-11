@@ -7,7 +7,8 @@ import { getProgressBarColor, getDinnerOption } from '../../utils/calculations';
 import type { DinnerOption } from '../../constants/meals';
 import { MealCard } from '../ui/MealCard';
 import { DinnerDropdown } from '../ui/DinnerDropdown';
-import { isSunday } from '../../utils/dateHelpers';
+import { isSunday, getWeekStart, formatDateDisplay } from '../../utils/dateHelpers';
+import { supabase } from '../../lib/supabase';
 
 export function OverviewTab() {
   const { log, loading, isRestDay, updateLog } = useDay();
@@ -21,6 +22,7 @@ export function OverviewTab() {
 
   const meals = getMealsForDay(isRestDay);
   const mealStatus = log?.meals || {};
+  const [weeklyWeightLog, setWeeklyWeightLog] = useState<{ date: string; weight: number } | null>(null);
 
   useEffect(() => {
     if (log?.dinner_type) {
@@ -31,6 +33,32 @@ export function OverviewTab() {
       setCustomDinner(log.dinner_custom as typeof customDinner);
     }
   }, [log?.dinner_type, log?.dinner_custom]);
+
+  useEffect(() => {
+    const fetchWeeklyWeight = async () => {
+      const weekStart = getWeekStart(new Date());
+      const todayDate = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('daily_logs')
+        .select('date, weight')
+        .gte('date', weekStart)
+        .lte('date', todayDate)
+        .not('weight', 'is', null)
+        .order('date', { ascending: true });
+      if (error) {
+        console.error('Error fetching weekly weight log:', error);
+        return;
+      }
+      if (data && data.length > 0) {
+        const lastLog = data[data.length - 1] as { date: string; weight: number };
+        setWeeklyWeightLog(lastLog);
+      } else {
+        setWeeklyWeightLog(null);
+      }
+    };
+
+    fetchWeeklyWeight();
+  }, [log?.weight]);
 
   const totalCal = meals.reduce((sum, m) => {
     if (mealStatus[m.id] !== 'done') return sum;
@@ -193,23 +221,27 @@ export function OverviewTab() {
         </div>
       </div>
 
-      {/* Sunday Weight */}
-      {isSunday() && (
-        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Scale className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs text-slate-400">Sunday Weigh-in</span>
-          </div>
-          <input
-            type="number"
-            step="0.1"
-            placeholder="Weight in kg"
-            value={log?.weight || ''}
-            onChange={handleWeightLog}
-            className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-emerald-400/50 focus:outline-none"
-          />
+      {/* Weekly Weight */}
+      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Scale className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs text-slate-400">Weekly Weigh-in</span>
         </div>
-      )}
+        <input
+          type="number"
+          step="0.1"
+          placeholder="Weight in kg"
+          value={weeklyWeightLog?.weight ?? log?.weight ?? ''}
+          onChange={handleWeightLog}
+          disabled={Boolean(weeklyWeightLog)}
+          className={`w-full bg-[#0a0a0f] border rounded-lg px-3 py-2 text-sm placeholder-slate-600 focus:outline-none ${weeklyWeightLog ? 'border-slate-700 text-slate-400 bg-[#0d0d13] cursor-not-allowed' : 'border-[#1e1e2e] text-white focus:border-emerald-400/50'}`}
+        />
+        <p className={`text-[10px] mt-2 ${weeklyWeightLog ? 'text-slate-500' : 'text-slate-400'}`}>
+          {weeklyWeightLog
+            ? `Weight logged for the week on ${formatDateDisplay(weeklyWeightLog.date)}. Next entry available after this week.`
+            : 'Enter your weight once per week. Your weekly weight is shown in progress charts.'}
+        </p>
+      </div>
 
       {/* Daily Checklist */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">

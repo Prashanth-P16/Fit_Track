@@ -6,7 +6,7 @@ import type { Exercise, WorkoutDay } from '../../constants/workouts';
 import { ExerciseCard } from '../ui/ExerciseCard';
 import { getSleepColor, calculateSleepHours } from '../../utils/calculations';
 import { supabase } from '../../lib/supabase';
-import { isFirstOfMonth, getDateForWorkoutDay, getDayLabel, getDaysAgo } from '../../utils/dateHelpers';
+import { isFirstOfMonth, getDateForWorkoutDay, getDayLabel, getDaysAgo, formatDate, getMonthStart, getMonthEnd, formatDateDisplay } from '../../utils/dateHelpers';
 
 const MEASUREMENT_FIELDS = [
   { key: 'waist', label: 'Waist', hint: 'At navel level' },
@@ -49,6 +49,45 @@ export function GymSleepTab() {
     waist: '', hips: '', chest: '', thighs: '', biceps: '', forearms: '', calves: '', shoulders: '', neck: '',
   });
   const [measurementsSaved, setMeasurementsSaved] = useState(false);
+  const [monthlyMeasurementLocked, setMonthlyMeasurementLocked] = useState(false);
+  const [monthlyMeasurementDate, setMonthlyMeasurementDate] = useState<string | null>(null);
+
+  const checkMonthlyMeasurement = useCallback(async () => {
+    const now = new Date();
+    const monthStart = getMonthStart(now);
+    const monthEnd = getMonthEnd(now);
+    const { data, error } = await supabase
+      .from('body_measurements')
+      .select('*')
+      .gte('date', monthStart)
+      .lte('date', monthEnd)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching monthly measurements:', error);
+      return;
+    }
+
+    if (data) {
+      const prev: Record<MeasurementKey, string> = {} as Record<MeasurementKey, string>;
+      MEASUREMENT_FIELDS.forEach(({ key }) => {
+        const val = data[key as keyof typeof data];
+        prev[key] = val != null ? String(val) : '';
+      });
+      setMeasurements(prev);
+      setMonthlyMeasurementLocked(true);
+      setMonthlyMeasurementDate(data.date as string);
+    } else {
+      setMonthlyMeasurementLocked(false);
+      setMonthlyMeasurementDate(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkMonthlyMeasurement();
+  }, [checkMonthlyMeasurement]);
 
   // Last week's exercise history grouped by exercise name
   const [lastWeekHistory, setLastWeekHistory] = useState<Record<string, HistorySet[]>>({});
@@ -310,6 +349,8 @@ export function GymSleepTab() {
   );
 
   const handleSaveMeasurements = useCallback(async () => {
+    if (monthlyMeasurementLocked) return;
+
     const today = new Date().toISOString().split('T')[0];
     const values: Record<string, number> = {};
     MEASUREMENT_FIELDS.forEach(({ key }) => {
@@ -317,17 +358,20 @@ export function GymSleepTab() {
       if (!isNaN(val) && val > 0) values[key] = val;
     });
 
+    if (Object.keys(values).length === 0) return;
+
     await supabase.from('body_measurements').insert({
       date: today,
       ...values,
     });
 
     setMeasurementsSaved(true);
+    await checkMonthlyMeasurement();
     setTimeout(() => {
       setMeasurementsSaved(false);
       setShowMeasurements(false);
     }, 1500);
-  }, [measurements]);
+  }, [measurements, monthlyMeasurementLocked, checkMonthlyMeasurement]);
 
   const handleMarkNoGym = useCallback(async () => {
     if (!log) return;
@@ -571,13 +615,20 @@ export function GymSleepTab() {
           </div>
           <button
             onClick={() => setShowMeasurements(!showMeasurements)}
-            className="px-3 py-1.5 text-[10px] bg-amber-400/10 text-amber-400 rounded-lg hover:bg-amber-400/20 transition-colors"
+            disabled={monthlyMeasurementLocked}
+            className={`px-3 py-1.5 text-[10px] rounded-lg transition-colors ${monthlyMeasurementLocked ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-amber-400/10 text-amber-400 hover:bg-amber-400/20'}`}
           >
-            {showMeasurements ? 'Close' : 'Log Measurements'}
+            {monthlyMeasurementLocked ? 'Measurements logged this month' : showMeasurements ? 'Close' : 'Log Measurements'}
           </button>
         </div>
 
-        {isFirstOfMonth() && !showMeasurements && (
+        {monthlyMeasurementLocked && monthlyMeasurementDate && (
+          <p className="text-[10px] text-slate-500 mb-2">
+            Measurements logged for this month on {formatDateDisplay(monthlyMeasurementDate)}. Next entry opens next month.
+          </p>
+        )}
+
+        {isFirstOfMonth() && !showMeasurements && !monthlyMeasurementLocked && (
           <p className="text-xs text-amber-400 mb-2">1st of the month — time to take measurements!</p>
         )}
 

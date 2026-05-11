@@ -44,6 +44,27 @@ export function getToday(): string {
   return formatDate(new Date());
 }
 
+export function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return formatDate(d);
+}
+
+export function getMonthStart(date: Date = new Date()): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  return formatDate(d);
+}
+
+export function getMonthEnd(date: Date = new Date()): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setMonth(d.getMonth() + 1, 0);
+  return formatDate(d);
+}
+
 export function getDayLabel(dayNumber: number): string {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const idx = ((dayNumber - 1) % 7);
