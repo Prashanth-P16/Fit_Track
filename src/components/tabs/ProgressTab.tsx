@@ -18,6 +18,7 @@ import { getDaysAgo, formatDateDisplay } from '../../utils/dateHelpers';
 
 export function ProgressTab() {
   const { targets } = useSettings();
+  const [loading, setLoading] = useState(true);
   const [weightData, setWeightData] = useState<{ date: string; weight: number }[]>([]);
   const [calData, setCalData] = useState<{ day: string; calories: number; target: number }[]>([]);
   const [proteinData, setProteinData] = useState<{ day: string; protein: number; target: number }[]>([]);
@@ -139,11 +140,20 @@ export function ProgressTab() {
       .order('date', { ascending: false })
       .limit(30);
     if (allLogs) setHistoryLogs(allLogs as { date: string; day_num: number; weight: number | null; ai_score: number | null }[]);
+    setLoading(false);
   }, [targets]);
 
   useEffect(() => {
     fetchProgressData();
   }, [fetchProgressData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pb-28 space-y-4">

@@ -30,30 +30,26 @@ export function MealCard({ meal, status, onDone, onSkip }: MealCardProps) {
         </div>
       </div>
       <div className="flex gap-1.5 shrink-0">
-        {status === 'pending' ? (
-          <>
-            <button
-              onClick={onDone}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20 transition-colors"
-            >
-              <Check className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onSkip}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-400/10 text-red-400 hover:bg-red-400/20 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <div
-            className={`w-9 h-9 flex items-center justify-center rounded-lg ${
-              status === 'done' ? 'bg-emerald-400/20 text-emerald-400' : 'bg-red-400/20 text-red-400'
-            }`}
-          >
-            {status === 'done' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-          </div>
-        )}
+        <button
+          onClick={onDone}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
+            status === 'done'
+              ? 'bg-emerald-400/20 text-emerald-400 hover:bg-emerald-400/30'
+              : 'bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20'
+          }`}
+        >
+          <Check className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onSkip}
+          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
+            status === 'skipped'
+              ? 'bg-red-400/20 text-red-400 hover:bg-red-400/30'
+              : 'bg-red-400/10 text-red-400 hover:bg-red-400/20'
+          }`}
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );

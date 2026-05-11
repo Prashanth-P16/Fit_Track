@@ -7,7 +7,7 @@ interface HeaderProps {
 
 export function Header({ dayNum, workoutLabel }: HeaderProps) {
   return (
-    <header className="px-4 pt-4 pb-2">
+    <header className="px-4 pt-8 pb-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Activity className="w-6 h-6 text-emerald-400" />
