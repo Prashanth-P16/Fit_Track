@@ -2,11 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getDayNumber, getWorkoutDayNum, getToday } from '../utils/dateHelpers';
 import { WORKOUTS } from '../constants/workouts';
-import { useAuth } from './useAuth';
 
 export interface DailyLog {
   id: string;
-  user_id: string;
   date: string;
   day_num: number;
   meals: Record<string, 'done' | 'skipped' | 'pending'>;
@@ -24,7 +22,6 @@ export interface DailyLog {
 }
 
 export function useDay() {
-  const { user } = useAuth();
   const [log, setLog] = useState<DailyLog | null>(null);
   const [loading, setLoading] = useState(true);
   const today = getToday();
@@ -34,15 +31,10 @@ export function useDay() {
   const todayWorkout = WORKOUTS[workoutDayNum] || WORKOUTS[7];
 
   const fetchLog = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
     const { data, error } = await supabase
       .from('daily_logs')
       .select('*')
       .eq('date', today)
-      .eq('user_id', user.id)
       .maybeSingle();
 
     if (error) {
@@ -55,7 +47,6 @@ export function useDay() {
       setLog(data as DailyLog);
     } else {
       const newLog = {
-        user_id: user.id,
         date: today,
         day_num: dayNum,
         meals: {},
@@ -77,16 +68,15 @@ export function useDay() {
       }
     }
     setLoading(false);
-  }, [today, dayNum, user]);
+  }, [today, dayNum]);
 
   useEffect(() => {
     fetchLog();
   }, [fetchLog]);
 
   const updateLog = useCallback(async (updates: Partial<DailyLog>) => {
-    if (!log || !user) return;
+    if (!log) return;
 
-    // Deep merge workout and sleep objects instead of replacing
     const cleanUpdates: Record<string, unknown> = { ...updates, updated_at: new Date().toISOString() };
 
     if (updates.workout) {
@@ -107,7 +97,6 @@ export function useDay() {
       .from('daily_logs')
       .update(cleanUpdates)
       .eq('id', log.id)
-      .eq('user_id', user.id)
       .select()
       .maybeSingle();
 
@@ -116,7 +105,7 @@ export function useDay() {
       return;
     }
     if (data) setLog(data as DailyLog);
-  }, [log, user]);
+  }, [log]);
 
   return {
     log,

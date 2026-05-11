@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { DEFAULT_TARGETS } from '../constants/targets';
-import { useAuth } from './useAuth';
 
 export interface UserSettings {
   id: string;
-  user_id: string;
   calorie_target: number;
   protein_target: number;
   water_target: number;
@@ -17,16 +15,13 @@ export interface UserSettings {
 }
 
 export function useSettings() {
-  const { user } = useAuth();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
-    if (!user) return;
     const { data, error } = await supabase
       .from('user_settings')
       .select('*')
-      .eq('user_id', user.id)
       .maybeSingle();
 
     if (error) {
@@ -38,7 +33,6 @@ export function useSettings() {
       const { data: inserted, error: insertError } = await supabase
         .from('user_settings')
         .insert({
-          user_id: user.id,
           calorie_target: 1824,
           protein_target: 169,
           water_target: 4000,
@@ -56,20 +50,19 @@ export function useSettings() {
       setSettings(data as UserSettings);
     }
     setLoading(false);
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
-    if (!settings || !user) return;
+    if (!settings) return;
 
     const { data, error } = await supabase
       .from('user_settings')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', settings.id)
-      .eq('user_id', user.id)
       .select()
       .maybeSingle();
 
@@ -78,7 +71,7 @@ export function useSettings() {
       return;
     }
     setSettings(data);
-  }, [settings, user]);
+  }, [settings]);
 
   const targets = settings
     ? {

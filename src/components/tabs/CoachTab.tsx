@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { Bot, Copy, StickyNote } from 'lucide-react';
 import { useDay } from '../../hooks/useDay';
 import { useSettings } from '../../hooks/useSettings';
-import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { SuggestionCard } from '../ui/SuggestionCard';
 
@@ -21,7 +20,6 @@ interface Suggestion {
 }
 
 export function CoachTab() {
-  const { user } = useAuth();
   const { log, loading, updateLog } = useDay();
   const { settings, targets } = useSettings();
   const [analyzing, setAnalyzing] = useState(false);
@@ -38,35 +36,31 @@ export function CoachTab() {
   }, [log]);
 
   const fetchSuggestions = useCallback(async () => {
-    if (!user) return;
     const { data } = await supabase
       .from('suggestion_tracker')
       .select('*')
-      .eq('user_id', user.id)
       .order('suggested_date', { ascending: false });
     if (data) setSuggestions(data as Suggestion[]);
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchSuggestions();
   }, [fetchSuggestions]);
 
   const handleAnalyze = useCallback(async () => {
-    if (!log || !user) return;
+    if (!log) return;
     setAnalyzing(true);
 
     try {
       const { data: weekHistory } = await supabase
         .from('daily_logs')
         .select('*')
-        .eq('user_id', user.id)
         .gte('date', new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0])
         .order('date', { ascending: true });
 
       const { data: suggestionHistory } = await supabase
         .from('suggestion_tracker')
         .select('*')
-        .eq('user_id', user.id)
         .order('suggested_date', { ascending: false })
         .limit(5);
 
@@ -102,7 +96,7 @@ export function CoachTab() {
     } finally {
       setAnalyzing(false);
     }
-  }, [log, settings, targets, updateLog, user]);
+  }, [log, settings, targets, updateLog]);
 
   const handleExportJSON = useCallback(() => {
     if (!log) return;
@@ -129,34 +123,28 @@ export function CoachTab() {
 
   const handleSuggestionResponse = useCallback(
     async (suggestionId: string, response: 'implementing' | 'will_do' | 'rejected') => {
-      if (!user) return;
       await supabase
         .from('suggestion_tracker')
         .update({ response_type: response })
-        .eq('id', suggestionId)
-        .eq('user_id', user.id);
+        .eq('id', suggestionId);
       fetchSuggestions();
     },
-    [fetchSuggestions, user]
+    [fetchSuggestions]
   );
 
   const handleRejectionReason = useCallback(async (suggestionId: string, reason: string) => {
-    if (!user) return;
     await supabase
       .from('suggestion_tracker')
       .update({ rejection_reason: reason })
-      .eq('id', suggestionId)
-      .eq('user_id', user.id);
-  }, [user]);
+      .eq('id', suggestionId);
+  }, []);
 
   const handleFeedback = useCallback(async (suggestionId: string, feedback: string) => {
-    if (!user) return;
     await supabase
       .from('suggestion_tracker')
       .update({ user_feedback: feedback, user_feedback_date: new Date().toISOString().split('T')[0] })
-      .eq('id', suggestionId)
-      .eq('user_id', user.id);
-  }, [user]);
+      .eq('id', suggestionId);
+  }, []);
 
   if (loading) {
     return (

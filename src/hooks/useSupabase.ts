@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getDaysAgo } from '../utils/dateHelpers';
-import { useAuth } from './useAuth';
 
 export interface WeekLog {
   date: string;
@@ -16,17 +15,14 @@ export interface WeekLog {
 }
 
 export function useSupabase() {
-  const { user } = useAuth();
   const [weekLogs, setWeekLogs] = useState<WeekLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchWeekLogs = useCallback(async () => {
-    if (!user) return;
     const sevenDaysAgo = getDaysAgo(7);
     const { data, error } = await supabase
       .from('daily_logs')
       .select('*')
-      .eq('user_id', user.id)
       .gte('date', sevenDaysAgo)
       .order('date', { ascending: true });
 
@@ -36,18 +32,16 @@ export function useSupabase() {
     }
     setWeekLogs((data as WeekLog[]) || []);
     setLoading(false);
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchWeekLogs();
   }, [fetchWeekLogs]);
 
   const fetchLogsRange = useCallback(async (startDate: string, endDate: string) => {
-    if (!user) return [];
     const { data, error } = await supabase
       .from('daily_logs')
       .select('*')
-      .eq('user_id', user.id)
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
@@ -57,14 +51,12 @@ export function useSupabase() {
       return [];
     }
     return (data as WeekLog[]) || [];
-  }, [user]);
+  }, []);
 
   const fetchAllLogs = useCallback(async () => {
-    if (!user) return [];
     const { data, error } = await supabase
       .from('daily_logs')
       .select('*')
-      .eq('user_id', user.id)
       .order('date', { ascending: true });
 
     if (error) {
@@ -72,7 +64,7 @@ export function useSupabase() {
       return [];
     }
     return (data as WeekLog[]) || [];
-  }, [user]);
+  }, []);
 
   return { weekLogs, loading, fetchWeekLogs, fetchLogsRange, fetchAllLogs };
 }

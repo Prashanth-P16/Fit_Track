@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Moon, Dumbbell, ArrowRightLeft, Ruler, X, Check } from 'lucide-react';
 import { useDay } from '../../hooks/useDay';
-import { useAuth } from '../../hooks/useAuth';
 import { WORKOUTS, CARDIO_CONFIG } from '../../constants/workouts';
 import type { Exercise, WorkoutDay } from '../../constants/workouts';
 import { ExerciseCard } from '../ui/ExerciseCard';
@@ -24,7 +23,6 @@ const MEASUREMENT_FIELDS = [
 type MeasurementKey = (typeof MEASUREMENT_FIELDS)[number]['key'];
 
 export function GymSleepTab() {
-  const { user } = useAuth();
   const { log, loading, dayNum, workoutDayNum, todayWorkout, updateLog } = useDay();
   const [exerciseSets, setExerciseSets] = useState<Record<string, { weight: string; reps: string }[]>>({});
   const [showSwap, setShowSwap] = useState(false);
@@ -38,10 +36,8 @@ export function GymSleepTab() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [sleepSaved, setSleepSaved] = useState(false);
 
-  // Swap state
   const [swappedWorkoutDay, setSwappedWorkoutDay] = useState<number | null>(null);
 
-  // Measurements state
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [measurements, setMeasurements] = useState<Record<MeasurementKey, string>>({
     waist: '', hips: '', chest: '', thighs: '', biceps: '', forearms: '', calves: '', shoulders: '', neck: '',
@@ -50,12 +46,10 @@ export function GymSleepTab() {
 
   const sleepHours = bedtime && wakeTime ? calculateSleepHours(bedtime, wakeTime) : 0;
 
-  // Determine which workout to actually show (considering swap)
   const activeWorkoutDay = swappedWorkoutDay || workoutDayNum;
   const activeWorkout: WorkoutDay = WORKOUTS[activeWorkoutDay] || WORKOUTS[7];
   const activeIsRestDay = activeWorkoutDay === 7;
 
-  // Load existing data from log
   useEffect(() => {
     if (!log) return;
     if (log.sleep?.bedtime) setBedtime(log.sleep.bedtime as string);
@@ -75,11 +69,9 @@ export function GymSleepTab() {
   }, [showMeasurements]);
 
   const fetchLatestMeasurements = async () => {
-    if (!user) return;
     const { data } = await supabase
       .from('body_measurements')
       .select('*')
-      .eq('user_id', user.id)
       .order('date', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -107,7 +99,7 @@ export function GymSleepTab() {
   );
 
   const handleSaveWorkout = useCallback(async () => {
-    if (!user || !log) return;
+    if (!log) return;
     setSaving(true);
 
     try {
@@ -128,7 +120,6 @@ export function GymSleepTab() {
         },
       });
 
-      // Save to exercise_history
       const today = new Date().toISOString().split('T')[0];
       for (const [name, sets] of Object.entries(exerciseSets)) {
         for (let i = 0; i < sets.length; i++) {
@@ -136,7 +127,6 @@ export function GymSleepTab() {
           const reps = Number(sets[i].reps);
           if (weight > 0 && reps > 0) {
             await supabase.from('exercise_history').insert({
-              user_id: user.id,
               date: today,
               day_num: dayNum,
               exercise_name: name,
@@ -156,7 +146,7 @@ export function GymSleepTab() {
     } finally {
       setSaving(false);
     }
-  }, [exerciseSets, noGym, noGymReason, cardioDone, log, updateLog, dayNum, user]);
+  }, [exerciseSets, noGym, noGymReason, cardioDone, log, updateLog, dayNum]);
 
   const handleSleepSave = useCallback(async () => {
     if (!log) return;
@@ -185,7 +175,6 @@ export function GymSleepTab() {
   );
 
   const handleSaveMeasurements = useCallback(async () => {
-    if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     const values: Record<string, number> = {};
     MEASUREMENT_FIELDS.forEach(({ key }) => {
@@ -194,7 +183,6 @@ export function GymSleepTab() {
     });
 
     await supabase.from('body_measurements').insert({
-      user_id: user.id,
       date: today,
       ...values,
     });
@@ -204,7 +192,7 @@ export function GymSleepTab() {
       setMeasurementsSaved(false);
       setShowMeasurements(false);
     }, 1500);
-  }, [user, measurements]);
+  }, [measurements]);
 
   const handleMarkNoGym = useCallback(async () => {
     if (!log) return;
@@ -263,7 +251,6 @@ export function GymSleepTab() {
           </button>
         </div>
 
-        {/* Swap Panel */}
         {showSwap && (
           <div className="mb-3 p-3 bg-[#0a0a0f] rounded-lg space-y-1.5">
             <p className="text-xs text-slate-400 mb-2">Swap today's workout with:</p>
@@ -287,7 +274,6 @@ export function GymSleepTab() {
           </div>
         )}
 
-        {/* Action Buttons Row */}
         <div className="flex gap-2 mb-3">
           <button
             onClick={handleMarkNoGym}
@@ -316,7 +302,6 @@ export function GymSleepTab() {
           )}
         </div>
 
-        {/* No Gym Reason */}
         {noGym && (
           <input
             type="text"
@@ -327,7 +312,6 @@ export function GymSleepTab() {
           />
         )}
 
-        {/* Cardio Info */}
         {!activeIsRestDay && !noGym && (
           <div className="p-2.5 bg-[#0a0a0f] rounded-lg">
             <p className="text-xs text-white">
@@ -339,7 +323,6 @@ export function GymSleepTab() {
           </div>
         )}
 
-        {/* Workout Done Badge */}
         {workoutDone && (
           <div className="mt-3 flex items-center gap-2 p-2.5 bg-emerald-400/10 rounded-lg">
             <Check className="w-4 h-4 text-emerald-400" />
@@ -348,7 +331,6 @@ export function GymSleepTab() {
         )}
       </div>
 
-      {/* Exercises */}
       {!noGym && !activeIsRestDay && (
         <div className="space-y-2">
           {activeWorkout.exercises.map((exercise: Exercise) => (
@@ -381,7 +363,6 @@ export function GymSleepTab() {
         </div>
       )}
 
-      {/* Rest Day Info */}
       {activeIsRestDay && !noGym && (
         <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
           <p className="text-sm text-white font-medium">Rest Day</p>

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useSettings } from '../../hooks/useSettings';
-import { useAuth } from '../../hooks/useAuth';
 import { GoalProgressRing } from '../charts/GoalProgressRing';
 import { StreakCounter } from '../charts/StreakCounter';
 import { WeightTrendChart } from '../charts/WeightTrendChart';
@@ -18,7 +17,6 @@ import { STARTING_WEIGHT } from '../../constants/targets';
 import { getDaysAgo, formatDateDisplay } from '../../utils/dateHelpers';
 
 export function ProgressTab() {
-  const { user } = useAuth();
   const { targets } = useSettings();
   const [weightData, setWeightData] = useState<{ date: string; weight: number }[]>([]);
   const [calData, setCalData] = useState<{ day: string; calories: number; target: number }[]>([]);
@@ -35,14 +33,12 @@ export function ProgressTab() {
   const [overloadData] = useState<{ week: string; set1: number; set2: number; set3: number }[]>([]);
 
   const fetchProgressData = useCallback(async () => {
-    if (!user) return;
     const sevenDaysAgo = getDaysAgo(7);
     const fourteenDaysAgo = getDaysAgo(14);
 
     const { data: weightLogs } = await supabase
       .from('daily_logs')
       .select('date, weight')
-      .eq('user_id', user.id)
       .not('weight', 'is', null)
       .order('date', { ascending: true });
     if (weightLogs) {
@@ -54,7 +50,6 @@ export function ProgressTab() {
     const { data: weekLogs } = await supabase
       .from('daily_logs')
       .select('*')
-      .eq('user_id', user.id)
       .gte('date', sevenDaysAgo)
       .order('date', { ascending: true });
 
@@ -86,7 +81,6 @@ export function ProgressTab() {
     const { data: sleepLogs } = await supabase
       .from('daily_logs')
       .select('date, sleep')
-      .eq('user_id', user.id)
       .gte('date', fourteenDaysAgo)
       .order('date', { ascending: true });
     if (sleepLogs) {
@@ -103,7 +97,6 @@ export function ProgressTab() {
     const { data: gymLogs } = await supabase
       .from('daily_logs')
       .select('date, workout, day_num')
-      .eq('user_id', user.id)
       .gte('date', getDaysAgo(30))
       .order('date', { ascending: true });
     if (gymLogs) {
@@ -123,7 +116,6 @@ export function ProgressTab() {
     const { data: scoreLogs } = await supabase
       .from('daily_logs')
       .select('date, ai_score')
-      .eq('user_id', user.id)
       .not('ai_score', 'is', null)
       .order('date', { ascending: true });
     if (scoreLogs) {
@@ -138,18 +130,16 @@ export function ProgressTab() {
     const { data: measurements } = await supabase
       .from('body_measurements')
       .select('*')
-      .eq('user_id', user.id)
       .order('date', { ascending: true });
     if (measurements) setMeasurementData(measurements);
 
     const { data: allLogs } = await supabase
       .from('daily_logs')
       .select('*')
-      .eq('user_id', user.id)
       .order('date', { ascending: false })
       .limit(30);
     if (allLogs) setHistoryLogs(allLogs as { date: string; day_num: number; weight: number | null; ai_score: number | null }[]);
-  }, [targets, user]);
+  }, [targets]);
 
   useEffect(() => {
     fetchProgressData();
