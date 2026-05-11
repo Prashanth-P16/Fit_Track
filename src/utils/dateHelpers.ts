@@ -49,3 +49,13 @@ export function getDayLabel(dayNumber: number): string {
   const idx = ((dayNumber - 1) % 7);
   return days[idx];
 }
+
+export function getDateForWorkoutDay(targetWorkoutDay: number, referenceDate: Date = new Date()): string {
+  const today = new Date(referenceDate);
+  today.setHours(0, 0, 0, 0);
+  const currentWorkoutDay = getWorkoutDayNum(getDayNumber(today));
+  const diff = targetWorkoutDay - currentWorkoutDay;
+  const target = new Date(today);
+  target.setDate(target.getDate() + diff);
+  return formatDate(target);
+}

@@ -28,7 +28,25 @@ export function useDay() {
   const dayNum = Math.max(getDayNumber(), 1);
   const workoutDayNum = getWorkoutDayNum(dayNum);
   const isRestDay = workoutDayNum === 7;
-  const todayWorkout = WORKOUTS[workoutDayNum] || WORKOUTS[7];
+
+  // Resolve the actual workout to display, considering swaps
+  const resolveSwappedWorkoutDay = (logData: DailyLog | null): number => {
+    if (logData?.workout_swapped && logData?.swap_reason) {
+      const matches = logData.swap_reason.match(/Day (\d+)/g);
+      if (matches && matches.length >= 2) {
+        const fromDay = parseInt(matches[0].replace('Day ', ''));
+        const toDay = parseInt(matches[1].replace('Day ', ''));
+        // If today is the "from" day, show the "to" day's workout
+        if (fromDay === workoutDayNum) return toDay;
+        // If today is the "to" day, show the "from" day's workout
+        if (toDay === workoutDayNum) return fromDay;
+      }
+    }
+    return workoutDayNum;
+  };
+
+  const effectiveWorkoutDay = resolveSwappedWorkoutDay(log);
+  const todayWorkout = WORKOUTS[effectiveWorkoutDay] || WORKOUTS[7];
 
   const fetchLog = useCallback(async () => {
     const { data, error } = await supabase
@@ -112,6 +130,7 @@ export function useDay() {
     loading,
     dayNum,
     workoutDayNum,
+    effectiveWorkoutDay,
     isRestDay,
     todayWorkout,
     today,

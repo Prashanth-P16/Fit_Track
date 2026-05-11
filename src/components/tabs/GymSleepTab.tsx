@@ -6,7 +6,7 @@ import type { Exercise, WorkoutDay } from '../../constants/workouts';
 import { ExerciseCard } from '../ui/ExerciseCard';
 import { getSleepColor, calculateSleepHours } from '../../utils/calculations';
 import { supabase } from '../../lib/supabase';
-import { isFirstOfMonth } from '../../utils/dateHelpers';
+import { isFirstOfMonth, getDateForWorkoutDay, getDayLabel } from '../../utils/dateHelpers';
 
 const MEASUREMENT_FIELDS = [
   { key: 'waist', label: 'Waist', hint: 'At navel level' },
@@ -23,7 +23,7 @@ const MEASUREMENT_FIELDS = [
 type MeasurementKey = (typeof MEASUREMENT_FIELDS)[number]['key'];
 
 export function GymSleepTab() {
-  const { log, loading, dayNum, workoutDayNum, todayWorkout, updateLog } = useDay();
+  const { log, loading, dayNum, workoutDayNum, effectiveWorkoutDay, todayWorkout, updateLog } = useDay();
   const [exerciseSets, setExerciseSets] = useState<Record<string, { weight: string; reps: string }[]>>({});
   const [showSwap, setShowSwap] = useState(false);
   const [noGym, setNoGym] = useState(false);
@@ -35,8 +35,7 @@ export function GymSleepTab() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [sleepSaved, setSleepSaved] = useState(false);
-
-  const [swappedWorkoutDay, setSwappedWorkoutDay] = useState<number | null>(null);
+  const [swapConfirmMsg, setSwapConfirmMsg] = useState('');
 
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [measurements, setMeasurements] = useState<Record<MeasurementKey, string>>({
@@ -46,7 +45,10 @@ export function GymSleepTab() {
 
   const sleepHours = bedtime && wakeTime ? calculateSleepHours(bedtime, wakeTime) : 0;
 
-  const activeWorkoutDay = swappedWorkoutDay || workoutDayNum;
+  // Use the hook-resolved workout day (accounts for persisted swaps)
+  // plus any in-session swap that hasn't been persisted yet
+  const [pendingSwapDay, setPendingSwapDay] = useState<number | null>(null);
+  const activeWorkoutDay = pendingSwapDay || effectiveWorkoutDay;
   const activeWorkout: WorkoutDay = WORKOUTS[activeWorkoutDay] || WORKOUTS[7];
   const activeIsRestDay = activeWorkoutDay === 7;
 
@@ -58,10 +60,6 @@ export function GymSleepTab() {
     if (log.workout?.no_gym_reason) setNoGymReason(log.workout.no_gym_reason as string);
     if (log.workout?.done) setWorkoutDone(true);
     if (log.workout?.cardio_done) setCardioDone(true);
-    if (log.workout_swapped && log.swap_reason) {
-      const match = log.swap_reason.match(/Day (\d+)/);
-      if (match) setSwappedWorkoutDay(parseInt(match[1]));
-    }
   }, [log]);
 
   useEffect(() => {
@@ -164,14 +162,55 @@ export function GymSleepTab() {
   const handleSwapWorkout = useCallback(
     async (targetDay: number) => {
       if (!log) return;
-      setSwappedWorkoutDay(targetDay);
+
+      const targetDate = getDateForWorkoutDay(targetDay);
+      const todayLabel = WORKOUTS[workoutDayNum]?.label || `Day ${workoutDayNum}`;
+      const targetLabel = WORKOUTS[targetDay]?.label || `Day ${targetDay}`;
+
+      // Optimistically update UI
+      setPendingSwapDay(targetDay);
+
+      // Update today's log: mark swapped with target day
       await updateLog({
         workout_swapped: true,
         swap_reason: `Swapped Day ${workoutDayNum} with Day ${targetDay}`,
       });
+
+      // Update or create the target day's log: mark swapped with today's workout
+      const { data: targetLog } = await supabase
+        .from('daily_logs')
+        .select('id')
+        .eq('date', targetDate)
+        .maybeSingle();
+
+      if (targetLog) {
+        await supabase
+          .from('daily_logs')
+          .update({
+            workout_swapped: true,
+            swap_reason: `Swapped Day ${targetDay} with Day ${workoutDayNum}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', targetLog.id);
+      } else {
+        const targetDayNum = dayNum + (targetDay - workoutDayNum);
+        await supabase.from('daily_logs').insert({
+          date: targetDate,
+          day_num: targetDayNum,
+          meals: {},
+          water: 0,
+          workout: {},
+          workout_swapped: true,
+          swap_reason: `Swapped Day ${targetDay} with Day ${workoutDayNum}`,
+          sleep: {},
+        });
+      }
+
       setShowSwap(false);
+      setSwapConfirmMsg(`${todayLabel} swapped with ${targetLabel}`);
+      setTimeout(() => setSwapConfirmMsg(''), 3000);
     },
-    [workoutDayNum, updateLog, log]
+    [workoutDayNum, updateLog, log, dayNum]
   );
 
   const handleSaveMeasurements = useCallback(async () => {
@@ -236,6 +275,13 @@ export function GymSleepTab() {
 
   return (
     <div className="px-4 pb-28 space-y-4">
+      {/* Swap Confirmation Toast */}
+      {swapConfirmMsg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-emerald-400 text-[#0a0a0f] text-sm font-medium rounded-xl shadow-lg shadow-emerald-400/20 animate-[fadeInUp_0.3s_ease-out]">
+          {swapConfirmMsg}
+        </div>
+      )}
+
       {/* Gym Section */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
@@ -262,7 +308,7 @@ export function GymSleepTab() {
                   onClick={() => handleSwapWorkout(Number(key))}
                   className="w-full text-left px-3 py-2 text-xs text-white bg-[#1e1e2e] rounded-lg hover:bg-emerald-400/10 hover:text-emerald-400 transition-colors"
                 >
-                  Day {key}: {workout.label}
+                  {getDayLabel(Number(key))}: {workout.label}
                 </button>
               ))}
             <button
