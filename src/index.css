@@ -63,13 +63,3 @@ select {
     transform: translate(-50%, 0);
   }
 }
-
-a.badge[href*="bolt.new"] {
-  display: none !important;
-}
-[class*="badge"][href*="bolt.new"] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
